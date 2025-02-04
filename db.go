@@ -51,7 +51,7 @@ func Open(options Options) (*DB, error) {
 	if err := db.loadDataFiles(); err != nil {
 		return nil, err
 	}
-
+	return nil, nil
 }
 
 // 根据文件加载索引

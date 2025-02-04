@@ -16,4 +16,6 @@ var (
 	ErrDataFileSizeIllegal = errors.New("data file size is illegal")
 
 	ErrDataDirCorrupted = errors.New("data directory is corrupted")
+
+	ErrInvalidCrc = errors.New("invalid Crc checksum")
 )

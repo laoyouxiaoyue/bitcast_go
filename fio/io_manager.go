@@ -4,7 +4,7 @@ const DataFilePerm = 0644
 
 type IOManager interface {
 	// Read 读指定文件
-	Read([]byte, int64) (int error)
+	Read([]byte, int64) (int, error)
 	Write([]byte) (int, error)
 
 	// Sync 刷盘
@@ -12,4 +12,11 @@ type IOManager interface {
 
 	// Close 关闭文件
 	Close() error
+
+	// size 获取文件大小
+	Size() (int64, error)
+}
+
+func NewIOManager(fileName string) (IOManager, error) {
+	return NewFileIOManager(fileName)
 }

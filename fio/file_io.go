@@ -14,7 +14,7 @@ func NewFileIOManager(fileName string) (*FileIO, error) {
 	return &FileIO{fd: fd}, nil
 }
 
-func (fio *FileIO) Read(b []byte, offset int64) (res int, err error) {
+func (fio *FileIO) Read(b []byte, offset int64) (int, error) {
 	return fio.fd.ReadAt(b, offset)
 }
 func (fio *FileIO) Write(b []byte) (int, error) {
@@ -29,4 +29,12 @@ func (fio *FileIO) Sync() error {
 // Close 关闭文件
 func (fio *FileIO) Close() error {
 	return fio.fd.Close()
+}
+
+func (fio *FileIO) Size() (int64, error) {
+	stat, err := fio.fd.Stat()
+	if err != nil {
+		return 0, err
+	}
+	return stat.Size(), nil
 }
