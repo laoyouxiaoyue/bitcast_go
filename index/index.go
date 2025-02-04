@@ -10,6 +10,8 @@ type Indexer interface {
 	Put(key []byte, pos *data.LogRecordPos) bool
 	Get(key []byte) *data.LogRecordPos
 	Delete(key []byte) bool
+
+	Iterator(reverse bool) Iterator
 }
 type IndexType = int8
 
@@ -39,4 +41,21 @@ type Item struct {
 
 func (ai *Item) Less(bi btree.Item) bool {
 	return bytes.Compare(ai.key, bi.(*Item).key) == -1
+}
+
+type Iterator interface {
+	// Rewind 从头开始
+	Rewind()
+	// Seek 找到第一个大于等于或小于等于的目标key
+	Seek(key []byte)
+	// Next 跳转到下一个key
+	Next()
+	// Valid 检查是否有效
+	Valid() bool
+	// Key 获取当前key值
+	Key() []byte
+	// Value 获取当前key值的logrecordpos值
+	Value() *data.LogRecordPos
+	// Close 关闭迭代器 释放资源
+	Close()
 }

@@ -3,6 +3,7 @@ package bitcast_go
 import (
 	"bitcast_go/data"
 	"bitcast_go/index"
+	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -31,7 +32,7 @@ func Open(options Options) (*DB, error) {
 	if err := checkOptions(options); err != nil {
 		return nil, err
 	}
-
+	fmt.Printf(options.DirPath)
 	if _, err := os.Stat(options.DirPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(options.DirPath, os.ModePerm); err != nil {
 			return nil, err
@@ -51,7 +52,32 @@ func Open(options Options) (*DB, error) {
 	if err := db.loadDataFiles(); err != nil {
 		return nil, err
 	}
-	return nil, nil
+	return db, nil
+}
+
+func (db *DB) getValueByPostion(logRecordPos *data.LogRecordPos) ([]byte, error) {
+	var dataFile *data.DataFile
+	if db.activeFile.FileId == logRecordPos.Fid {
+		dataFile = db.activeFile
+	} else {
+		dataFile = db.olderFiles[logRecordPos.Fid]
+	}
+
+	//找不到
+	if dataFile == nil {
+		return nil, ErrDataFileNotFound
+	}
+
+	//根据偏移量查找位置
+	logRecord, _, err := dataFile.ReadLogRecord(logRecordPos.Offset)
+	if err != nil {
+		return nil, err
+	}
+
+	if logRecord.Type == data.LogRecordDeleted {
+		return nil, ErrDataFileNotFound
+	}
+	return logRecord.Value, nil
 }
 
 // 根据文件加载索引
@@ -208,33 +234,10 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 		return nil, ErrKeyNotFound
 	}
 
-	var dataFile *data.DataFile
-	if db.activeFile.FileId == logRecordPos.Fid {
-		dataFile = db.activeFile
-	} else {
-		dataFile = db.olderFiles[logRecordPos.Fid]
-	}
-
-	//找不到
-	if dataFile == nil {
-		return nil, ErrDataFileNotFound
-	}
-
-	//根据偏移量查找位置
-	logRecord, _, err := dataFile.ReadLogRecord(logRecordPos.Offset)
-	if err != nil {
-		return nil, err
-	}
-
-	if logRecord.Type == data.LogRecordDeleted {
-		return nil, ErrDataFileNotFound
-	}
-	return logRecord.Value, nil
+	return db.getValueByPostion(logRecordPos)
 }
 
 func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
 	if db.activeFile == nil {
 		if err := db.setActiveDataFile(); err != nil {
 			return nil, err
@@ -290,4 +293,8 @@ func (db *DB) setActiveDataFile() error {
 	}
 	db.activeFile = dataFile
 	return nil
+}
+
+func (db *DB) destroyDB() {
+	db.olderFiles = nil
 }

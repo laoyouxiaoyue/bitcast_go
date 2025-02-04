@@ -10,6 +10,12 @@ type Options struct {
 	IndexType IndexerType
 }
 
+type IteratorOptions struct {
+	Prefix []byte
+
+	Reverse bool
+}
+
 type IndexerType = int8
 
 const (
@@ -19,3 +25,15 @@ const (
 	// ART自适应基数树索引
 	ART
 )
+
+var DefaultIteratorOptions = IteratorOptions{
+	Prefix:  nil,
+	Reverse: false,
+}
+
+var DefaultOptions = Options{
+	DirPath:      ".",
+	DataFileSize: 64 * 1024 * 1024,
+	SyncWrites:   false,
+	IndexType:    BTree,
+}

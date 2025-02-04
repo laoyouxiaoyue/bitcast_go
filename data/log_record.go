@@ -30,7 +30,7 @@ func EncodeLogRecord(logRecord *LogRecord) ([]byte, int64) {
 	header := make([]byte, maxLogRecordHeaderSize)
 
 	header[4] = logRecord.Type
-	index := 5
+	var index = 5
 
 	index += binary.PutVarint(header[index:], int64(len(logRecord.Key)))
 	index += binary.PutVarint(header[index:], int64(len(logRecord.Value)))
@@ -83,9 +83,9 @@ func getLogRecordCRC(l *LogRecord, header []byte) uint32 {
 		return 0
 	}
 
-	crc := crc32.ChecksumIEEE(header)
-	crc32.Update(crc, crc32.IEEETable, l.Key)
-	crc32.Update(crc, crc32.IEEETable, l.Value)
+	crc := crc32.ChecksumIEEE(header[:])
+	crc = crc32.Update(crc, crc32.IEEETable, l.Key)
+	crc = crc32.Update(crc, crc32.IEEETable, l.Value)
 
 	return crc
 
