@@ -4,6 +4,7 @@ import (
 	"bitcast_go/utils"
 	"github.com/stretchr/testify/assert"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -50,4 +51,124 @@ func TestDB_Iterator_One_Value(t *testing.T) {
 	val, err := iterator.Value()
 	assert.NoError(t, err)
 	assert.Equal(t, utils.GetTestKey(10), val)
+}
+
+func TestDB_Iterator_All_Value(t *testing.T) {
+	opts := DefaultOptions
+	dir, _ := os.MkdirTemp("", "bitcast-go-iterator3")
+	opts.DirPath = dir
+	db, err := Open(opts)
+	defer db.destroyDB()
+	assert.NoError(t, err)
+	assert.NotNil(t, db)
+
+	err = db.Put([]byte("a"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("b"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("c"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("d"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("e"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("ef"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("efz"), utils.RandomValue(10))
+	assert.Nil(t, err)
+
+	iter := db.NewIterator(DefaultIteratorOptions)
+	for iter.Rewind(); iter.Valid(); iter.Next() {
+		t.Log("key = ", string(iter.Key()))
+	}
+
+	t.Log("---------------------------------------------\n")
+	iter.Rewind()
+	for iter.Seek([]byte("c")); iter.Valid(); iter.Next() {
+		t.Log("key = ", string(iter.Key()))
+	}
+	t.Log("---------------------------------------------\n")
+	// 反向
+	iterOpts1 := DefaultIteratorOptions
+	iterOpts1.Reverse = true
+	iter2 := db.NewIterator(iterOpts1)
+	for iter2.Rewind(); iter2.Valid(); iter2.Next() {
+		t.Log("key = ", string(iter2.Key()))
+	}
+	t.Log("---------------------------------------------\n")
+	iterOpts2 := DefaultIteratorOptions
+	iterOpts2.Reverse = true
+	pre := []byte("e")
+	iterOpts2.Prefix = pre
+	iter3 := db.NewIterator(iterOpts2)
+	for iter3.Rewind(); iter3.Valid(); iter3.Next() {
+		assert.True(t, strings.HasPrefix(string(iter3.Key()), string(pre)))
+		t.Log("key = ", string(iter3.Key()))
+	}
+}
+
+func TestDB_ListKeys(t *testing.T) {
+	opts := DefaultOptions
+	dir, _ := os.MkdirTemp("", "bitcast-go-iterator-ListKeys")
+
+	opts.DirPath = dir
+	db, err := Open(opts)
+	defer db.destroyDB()
+	assert.NoError(t, err)
+	assert.NotNil(t, db)
+
+	keys := db.ListKeys()
+	assert.Equal(t, 0, len(keys))
+
+	err = db.Put([]byte("a"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("b"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("c"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("d"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("e"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("ef"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("efz"), utils.RandomValue(10))
+	assert.Nil(t, err)
+
+	keys = db.ListKeys()
+	assert.Equal(t, 7, len(keys))
+	for _, key := range keys {
+		t.Log(key)
+	}
+}
+
+func TestDB_Fold(t *testing.T) {
+	opts := DefaultOptions
+	dir, _ := os.MkdirTemp("", "bitcast-go-iterator-ListKeys")
+
+	opts.DirPath = dir
+	db, err := Open(opts)
+	defer db.destroyDB()
+	assert.NoError(t, err)
+	assert.NotNil(t, db)
+
+	err = db.Put([]byte("a"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("b"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("c"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("d"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("e"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("ef"), utils.RandomValue(10))
+	assert.Nil(t, err)
+	err = db.Put([]byte("efz"), utils.RandomValue(10))
+	assert.Nil(t, err)
+
+	err = db.Fold(func(key []byte, value []byte) bool {
+		return true
+	})
+	assert.Nil(t, err)
 }

@@ -3,7 +3,6 @@ package bitcast_go
 import (
 	"bitcast_go/data"
 	"bitcast_go/index"
-	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -32,7 +31,6 @@ func Open(options Options) (*DB, error) {
 	if err := checkOptions(options); err != nil {
 		return nil, err
 	}
-	fmt.Printf(options.DirPath)
 	if _, err := os.Stat(options.DirPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(options.DirPath, os.ModePerm); err != nil {
 			return nil, err
@@ -235,6 +233,33 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	}
 
 	return db.getValueByPostion(logRecordPos)
+}
+
+func (db *DB) ListKeys() [][]byte {
+	iterator := db.index.Iterator(false)
+	keys := make([][]byte, db.index.Size())
+	var idx int
+	for iterator.Rewind(); iterator.Valid(); iterator.Next() {
+		keys[idx] = iterator.Key()
+	}
+	return keys
+}
+
+func (db *DB) Fold(fn func(key []byte, value []byte) bool) error {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	iterator := db.index.Iterator(false)
+	for iterator.Rewind(); iterator.Valid(); iterator.Next() {
+		value, err := db.getValueByPostion(iterator.Value())
+		if err != nil {
+			return err
+		}
+		if !fn(iterator.Key(), value) {
+			break
+		}
+	}
+	return nil
 }
 
 func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, error) {
