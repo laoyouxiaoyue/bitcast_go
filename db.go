@@ -110,7 +110,7 @@ func (db *DB) loadDataFiles() error {
 
 			// 数据目录可能损坏
 			if err != nil {
-				return ErrDataDirectoryCorrupted
+				return ErrDataDirCorrupted
 			}
 
 			fileIds = append(fileIds, fileId)
@@ -167,6 +167,32 @@ func (db *DB) Put(key []byte, value []byte) error {
 	}
 	return nil
 
+}
+
+func (db *DB) Delete(key []byte) error {
+	if len(key) == 0 {
+		return ErrKeyIsEmpty
+	}
+
+	if pos := db.index.Get(key); pos == nil {
+		return nil
+	}
+
+	logRecord := &data.LogRecord{
+		Key:  key,
+		Type: data.LogRecordDeleted,
+	}
+
+	_, err := db.appendLogRecord(logRecord)
+	if err != nil {
+		return err
+	}
+
+	ok := db.index.Delete(key)
+	if !ok {
+		return ErrIndexUpdataFailed
+	}
+	return nil
 }
 
 func (db *DB) Get(key []byte) ([]byte, error) {

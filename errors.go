@@ -15,5 +15,5 @@ var (
 
 	ErrDataFileSizeIllegal = errors.New("data file size is illegal")
 
-	ErrDataDirectoryCorrupted = errors.New("data directory corrupted")
+	ErrDataDirCorrupted = errors.New("data directory is corrupted")
 )
