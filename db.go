@@ -5,6 +5,7 @@ import (
 	"bitcast_go/index"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,6 +26,8 @@ type DB struct {
 	fileIds []int // 文件 id,加载索引时使用
 
 	seqNo uint64 // 事务序列号，全局递增
+
+	isMerging bool
 }
 
 // 打开存储引擎
@@ -48,8 +51,15 @@ func Open(options Options) (*DB, error) {
 	}
 
 	// 加载数据文件
+	if err := db.loadMergeFiles(); err != nil {
+		return nil, err
+	}
 
 	if err := db.loadDataFiles(); err != nil {
+		return nil, err
+	}
+
+	if err := db.loadIndexFromHintFile(); err != nil {
 		return nil, err
 	}
 
@@ -119,6 +129,17 @@ func (db *DB) loadIndexerFromDataFiles() error {
 		return nil
 	}
 
+	hasMerge, nonMergeFileId := false, uint32(0)
+	mergeFinishedFileName := filepath.Join(db.options.DirPath, data.MergeFinishedFileName)
+	if _, err := os.Stat(mergeFinishedFileName); err == nil {
+		fid, err := db.getNonMergeFileId(db.options.DirPath)
+		if err != nil {
+			return err
+		}
+		hasMerge = true
+		nonMergeFileId = fid
+	}
+
 	updateIndex := func(key []byte, typ data.LogRecordType, pos *data.LogRecordPos) {
 		var ok bool
 		if typ == data.LogRecordDeleted {
@@ -136,6 +157,10 @@ func (db *DB) loadIndexerFromDataFiles() error {
 	var currentSeqNo uint64 = nonTransactionSeqNo
 	for _, fileId := range db.fileIds {
 		var fileId = uint32(fileId)
+		// 和上次merge了的file id作比较
+		if hasMerge && fileId < nonMergeFileId {
+			continue
+		}
 		var dataFile *data.DataFile
 		if fileId == db.activeFile.FileId {
 			dataFile = db.activeFile

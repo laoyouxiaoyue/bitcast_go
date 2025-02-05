@@ -18,4 +18,6 @@ var (
 	ErrDataDirCorrupted = errors.New("data directory is corrupted")
 
 	ErrExceedMaxBatchNum = errors.New("exceed max batch num")
+
+	ErrMergeisProgress = errors.New("merge is progress")
 )
