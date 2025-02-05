@@ -111,9 +111,9 @@ func TestDB_ListKeys(t *testing.T) {
 	opts := DefaultOptions
 	dir, _ := os.MkdirTemp("", "bitcast-go-iterator-ListKeys")
 
+	t.Log(dir)
 	opts.DirPath = dir
 	db, err := Open(opts)
-	defer db.destroyDB()
 	assert.NoError(t, err)
 	assert.NotNil(t, db)
 
@@ -135,6 +135,17 @@ func TestDB_ListKeys(t *testing.T) {
 	err = db.Put([]byte("efz"), utils.RandomValue(10))
 	assert.Nil(t, err)
 
+	err = db.Sync()
+	assert.Nil(t, err)
+	err = db.Close()
+	db, err = Open(opts)
+	defer func(db *DB) {
+		err := db.Close()
+		assert.NoError(t, err)
+	}(db)
+	assert.NoError(t, err)
+	assert.NotNil(t, db)
+	assert.NoError(t, err)
 	keys = db.ListKeys()
 	assert.Equal(t, 7, len(keys))
 	for _, key := range keys {

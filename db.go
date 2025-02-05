@@ -3,6 +3,7 @@ package bitcast_go
 import (
 	"bitcast_go/data"
 	"bitcast_go/index"
+	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -50,6 +51,10 @@ func Open(options Options) (*DB, error) {
 	if err := db.loadDataFiles(); err != nil {
 		return nil, err
 	}
+
+	if err := db.loadIndexerFromDataFiles(); err != nil {
+		return nil, err
+	}
 	return db, nil
 }
 
@@ -78,9 +83,38 @@ func (db *DB) getValueByPostion(logRecordPos *data.LogRecordPos) ([]byte, error)
 	return logRecord.Value, nil
 }
 
+// Close 关闭数据库
+func (db *DB) Close() error {
+	if db.activeFile == nil {
+		return nil
+	}
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	if err := db.activeFile.Close(); err != nil {
+		return err
+	}
+	for _, file := range db.olderFiles {
+		err := file.Close()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (db *DB) Sync() error {
+	if db.activeFile == nil {
+		return nil
+	}
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	return db.activeFile.Sync()
+}
+
 // 根据文件加载索引
 func (db *DB) loadIndexerFromDataFiles() error {
-	if len(db.olderFiles) == 0 {
+	if len(db.fileIds) == 0 {
 		return nil
 	}
 
@@ -104,8 +138,8 @@ func (db *DB) loadIndexerFromDataFiles() error {
 				return err
 
 			}
-
 			logRecordPos := &data.LogRecordPos{Fid: fileId, Offset: offset}
+			fmt.Printf("??????" + string(logRecord.Key))
 			if logRecord.Type == data.LogRecordDeleted {
 				db.index.Delete(logRecord.Key)
 			} else {

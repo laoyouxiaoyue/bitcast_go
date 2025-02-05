@@ -7,6 +7,21 @@ import (
 	"testing"
 )
 
+func destoryDB(db *DB) {
+	if db != nil {
+		if db.activeFile != nil {
+			if err := db.Close(); err != nil {
+				panic(err)
+			}
+
+			err := os.RemoveAll(db.options.DirPath)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+}
+
 func TestOpen(t *testing.T) {
 	opts := DefaultOptions
 	dir, _ := os.MkdirTemp("", "bitcast-go-iterator")
