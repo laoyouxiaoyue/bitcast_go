@@ -15,6 +15,10 @@ type BTree struct {
 	lock *sync.RWMutex
 }
 
+func (bt *BTree) Close() error {
+	return nil
+}
+
 func NewBTree() *BTree {
 	return &BTree{
 		tree: btree.New(32),

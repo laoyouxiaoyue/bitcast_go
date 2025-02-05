@@ -16,6 +16,10 @@ type adaptiveRadixTree struct {
 	lock *sync.RWMutex
 }
 
+func (a *adaptiveRadixTree) Close() error {
+	return nil
+}
+
 // NewART 初始化索引
 func NewART() *adaptiveRadixTree {
 	return &adaptiveRadixTree{

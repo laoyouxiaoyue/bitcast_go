@@ -155,7 +155,7 @@ func TestDB_ListKeys(t *testing.T) {
 
 func TestDB_Fold(t *testing.T) {
 	opts := DefaultOptions
-	dir, _ := os.MkdirTemp("", "bitcast-go-iterator-ListKeys")
+	dir, _ := os.MkdirTemp("", "bitcask-go-iterator-ListKeys")
 
 	opts.DirPath = dir
 	db, err := Open(opts)

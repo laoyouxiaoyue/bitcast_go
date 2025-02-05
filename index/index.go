@@ -12,6 +12,7 @@ type Indexer interface {
 	Delete(key []byte) bool
 	Size() int
 	Iterator(reverse bool) Iterator
+	Close() error
 }
 type IndexType = int8
 
@@ -21,14 +22,18 @@ const (
 
 	// ART ART自适应基数树
 	ART
+
+	BPTree
 )
 
-func NewIndexer(typ IndexType) Indexer {
+func NewIndexer(typ IndexType, dirPath string, sync bool) Indexer {
 	switch typ {
 	case Btree:
 		return NewBTree()
 	case ART:
-		return nil
+		return NewART()
+	case BPTree:
+		return NewBPlusTree(dirPath, sync)
 	default:
 		return nil
 	}

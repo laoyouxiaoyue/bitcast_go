@@ -4,7 +4,6 @@ import (
 	"bitcast_go/data"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -135,8 +134,9 @@ func (db *DB) Merge() error {
 }
 
 func (db *DB) getMergePath() string {
-	dir := path.Dir(path.Clean(db.options.DirPath))
-	base := path.Base(db.options.DirPath)
+	dir := filepath.Dir(filepath.Clean(db.options.DirPath))
+	// 获取数据目录名称
+	base := filepath.Base(db.options.DirPath)
 	return filepath.Join(dir, base+mergeDirName)
 }
 
@@ -160,8 +160,11 @@ func (db *DB) loadMergeFiles() error {
 	for _, file := range dirEntries {
 		if file.Name() == data.MergeFinishedFileName {
 			mergeFinished = true
-			mergeFileNames = append(mergeFileNames, file.Name())
 		}
+		if file.Name() == data.SeqNoFileName {
+			continue
+		}
+		mergeFileNames = append(mergeFileNames, file.Name())
 	}
 	if !mergeFinished {
 		return nil
@@ -212,7 +215,7 @@ func (db *DB) getNonMergeFileId(dirPath string) (uint32, error) {
 func (db *DB) loadIndexFromHintFile() error {
 	hintFileName := filepath.Join(db.options.DirPath, data.HintFileName)
 	if _, err := os.Stat(hintFileName); os.IsNotExist(err) {
-		return err
+		return nil
 	}
 	hintFile, err := data.OpenHintFile(db.options.DirPath)
 	if err != nil {
@@ -235,4 +238,5 @@ func (db *DB) loadIndexFromHintFile() error {
 		offset += size
 
 	}
+	return nil
 }

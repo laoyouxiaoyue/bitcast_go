@@ -32,6 +32,8 @@ const (
 
 	// ART自适应基数树索引
 	ART
+
+	BPlusTree
 )
 
 var DefaultIteratorOptions = IteratorOptions{
@@ -43,7 +45,7 @@ var DefaultOptions = Options{
 	DirPath:      ".",
 	DataFileSize: 64 * 1024 * 1024,
 	SyncWrites:   false,
-	IndexType:    BTree,
+	IndexType:    BPlusTree,
 }
 
 var DefaultWriteBatchOptions = WriteBatchOptions{
