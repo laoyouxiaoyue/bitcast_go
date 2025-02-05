@@ -10,6 +10,7 @@ type LogRecordType = byte
 const (
 	LogRecordNormal LogRecordType = iota
 	LogRecordDeleted
+	LogRecordTxnFinished
 )
 
 type LogRecord struct {
@@ -23,6 +24,11 @@ const maxLogRecordHeaderSize = binary.MaxVarintLen32*2 + 5
 type LogRecordPos struct {
 	Fid    uint32 // 文件 id ,数据所在位置
 	Offset int64  // 偏移，在这个文件块的哪个位置
+}
+
+type TransactionRecord struct {
+	Record *LogRecord
+	Pos    *LogRecordPos
 }
 
 // 编码Logrecord , 返回数组和长度

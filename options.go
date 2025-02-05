@@ -10,6 +10,14 @@ type Options struct {
 	IndexType IndexerType
 }
 
+type WriteBatchOptions struct {
+	// 一个批次当中最大的数据量
+	MaxBatchNum uint
+
+	// 提交时是否sync持久化
+	SyncWrites bool
+}
+
 type IteratorOptions struct {
 	Prefix []byte
 
@@ -36,4 +44,9 @@ var DefaultOptions = Options{
 	DataFileSize: 64 * 1024 * 1024,
 	SyncWrites:   false,
 	IndexType:    BTree,
+}
+
+var DefaultWriteBatchOptions = WriteBatchOptions{
+	MaxBatchNum: 10000,
+	SyncWrites:  true,
 }

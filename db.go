@@ -3,7 +3,6 @@ package bitcast_go
 import (
 	"bitcast_go/data"
 	"bitcast_go/index"
-	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -24,6 +23,8 @@ type DB struct {
 	index index.Indexer
 
 	fileIds []int // 文件 id,加载索引时使用
+
+	seqNo uint64 // 事务序列号，全局递增
 }
 
 // 打开存储引擎
@@ -118,7 +119,21 @@ func (db *DB) loadIndexerFromDataFiles() error {
 		return nil
 	}
 
+	updateIndex := func(key []byte, typ data.LogRecordType, pos *data.LogRecordPos) {
+		var ok bool
+		if typ == data.LogRecordDeleted {
+			ok = db.index.Delete(key)
+		} else {
+			ok = db.index.Put(key, pos)
+		}
+		if !ok {
+			panic("failed to update index")
+		}
+	}
 	var offset int64 = 0
+	// 暂存事务数据
+	transactionRecords := make(map[uint64][]*data.TransactionRecord)
+	var currentSeqNo uint64 = nonTransactionSeqNo
 	for _, fileId := range db.fileIds {
 		var fileId = uint32(fileId)
 		var dataFile *data.DataFile
@@ -138,13 +153,31 @@ func (db *DB) loadIndexerFromDataFiles() error {
 				return err
 
 			}
+
+			// 构造内存索引并保存
 			logRecordPos := &data.LogRecordPos{Fid: fileId, Offset: offset}
-			fmt.Printf("??????" + string(logRecord.Key))
-			if logRecord.Type == data.LogRecordDeleted {
-				db.index.Delete(logRecord.Key)
+
+			//解析key,拿到事务序列号
+			realKey, seqNo := parseLogRecordKey(logRecord.Key)
+			if seqNo == nonTransactionSeqNo {
+				// 非事务操作，直接更新内存
+				updateIndex(realKey, logRecord.Type, logRecordPos)
 			} else {
-				db.index.Put(logRecord.Key, logRecordPos)
+				// 事务完成，对应seq no的数据全更新
+				if logRecord.Type == data.LogRecordTxnFinished {
+					for _, txnRecord := range transactionRecords[seqNo] {
+						updateIndex(txnRecord.Record.Key, txnRecord.Record.Type, txnRecord.Pos)
+					}
+					delete(transactionRecords, seqNo)
+				} else {
+					logRecord.Key = realKey
+					transactionRecords[seqNo] = append(transactionRecords[seqNo], &data.TransactionRecord{
+						Record: logRecord,
+						Pos:    logRecordPos,
+					})
+				}
 			}
+			currentSeqNo = max(currentSeqNo, seqNo)
 			offset += size
 		}
 	}
@@ -210,12 +243,12 @@ func (db *DB) Put(key []byte, value []byte) error {
 	}
 
 	logRecord := &data.LogRecord{
-		Key:   key,
+		Key:   logRecordKeyWithSeq(key, nonTransactionSeqNo),
 		Value: value,
 		Type:  data.LogRecordNormal,
 	}
 
-	pos, err := db.appendLogRecord(logRecord)
+	pos, err := db.appendLogRecordWithLock(logRecord)
 	if err != nil {
 		return err
 	}
@@ -237,11 +270,11 @@ func (db *DB) Delete(key []byte) error {
 	}
 
 	logRecord := &data.LogRecord{
-		Key:  key,
+		Key:  logRecordKeyWithSeq(key, nonTransactionSeqNo),
 		Type: data.LogRecordDeleted,
 	}
 
-	_, err := db.appendLogRecord(logRecord)
+	_, err := db.appendLogRecordWithLock(logRecord)
 	if err != nil {
 		return err
 	}
@@ -296,13 +329,17 @@ func (db *DB) Fold(fn func(key []byte, value []byte) bool) error {
 	return nil
 }
 
+func (db *DB) appendLogRecordWithLock(logRecord *data.LogRecord) (*data.LogRecordPos, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	return db.appendLogRecord(logRecord)
+}
 func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, error) {
 	if db.activeFile == nil {
 		if err := db.setActiveDataFile(); err != nil {
 			return nil, err
 		}
 	}
-
 	encRecord, size := data.EncodeLogRecord(logRecord)
 
 	// 如果写满了,就换新的,把当前这个转为旧的
@@ -339,8 +376,7 @@ func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, er
 
 // 设置当前活跃文件
 func (db *DB) setActiveDataFile() error {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+
 	var initialFileId uint32 = 0
 	if db.activeFile != nil {
 		initialFileId = db.activeFile.FileId + 1

@@ -17,5 +17,5 @@ var (
 
 	ErrDataDirCorrupted = errors.New("data directory is corrupted")
 
-	ErrInvalidCrc = errors.New("invalid Crc checksum")
+	ErrExceedMaxBatchNum = errors.New("exceed max batch num")
 )
