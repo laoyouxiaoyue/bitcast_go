@@ -33,12 +33,15 @@ func (bt *BTree) Iterator(reverse bool) Iterator {
 	defer bt.lock.RUnlock()
 	return newBTreeIterator(bt.tree, reverse)
 }
-func (bt *BTree) Put(key []byte, pos *data.LogRecordPos) bool {
+func (bt *BTree) Put(key []byte, pos *data.LogRecordPos) *data.LogRecordPos {
 	it := &Item{key: key, pos: pos}
 	bt.lock.Lock()
-	bt.tree.ReplaceOrInsert(it)
+	oldItem := bt.tree.ReplaceOrInsert(it)
 	bt.lock.Unlock()
-	return true
+	if oldItem == nil {
+		return nil
+	}
+	return oldItem.(*Item).pos
 }
 func (bt *BTree) Size() int {
 	return bt.tree.Len()
@@ -51,15 +54,15 @@ func (bt *BTree) Get(key []byte) *data.LogRecordPos {
 	}
 	return btreeItem.(*Item).pos
 }
-func (bt *BTree) Delete(key []byte) bool {
+func (bt *BTree) Delete(key []byte) (*data.LogRecordPos, bool) {
 	it := &Item{key: key}
 	bt.lock.Lock()
 	defer bt.lock.Unlock()
 	oldItem := bt.tree.Delete(it)
 	if oldItem == nil {
-		return false
+		return nil, false
 	}
-	return true
+	return oldItem.(*Item).pos, true
 }
 
 type btreeIterator struct {

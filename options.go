@@ -14,6 +14,9 @@ type Options struct {
 
 	// 是否用mmap加载
 	MMapAtStartup bool
+
+	// 数据文件合并的阈值
+	DataFileMergeRatio float32
 }
 
 type WriteBatchOptions struct {
@@ -48,12 +51,13 @@ var DefaultIteratorOptions = IteratorOptions{
 }
 
 var DefaultOptions = Options{
-	DirPath:      ".",
-	DataFileSize: 64 * 1024 * 1024,
-	SyncWrites:   false,
-	BytesPerSync: 0,
-	IndexType:    BPlusTree,
-	MMapAtStartup: true
+	DirPath:            ".",
+	DataFileSize:       64 * 1024 * 1024,
+	SyncWrites:         false,
+	BytesPerSync:       0,
+	IndexType:          BPlusTree,
+	MMapAtStartup:      true,
+	DataFileMergeRatio: 0.5,
 }
 
 var DefaultWriteBatchOptions = WriteBatchOptions{

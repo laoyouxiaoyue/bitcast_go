@@ -2,6 +2,7 @@ package bitcast_go
 
 import (
 	"bitcast_go/data"
+	"bitcast_go/utils"
 	"io"
 	"os"
 	"path/filepath"
@@ -23,6 +24,27 @@ func (db *DB) Merge() error {
 	if db.isMerging {
 
 		return ErrMergeIsProgress
+	}
+
+	//查看是否可以merge了
+	totalSize, err := utils.DirSize(db.options.DirPath)
+	if err != nil {
+		db.mu.Unlock()
+		return err
+	}
+	if float32(db.reclaimSize)/float32(totalSize) < db.options.DataFileMergeRatio {
+		db.mu.Unlock()
+		return ErrMergeRationUnreached
+	}
+
+	availableDiskSize, err := utils.AvailableDiskSize()
+	if err != nil {
+		db.mu.Unlock()
+		return err
+	}
+	if uint64(totalSize-db.reclaimSize) >= availableDiskSize {
+		db.mu.Unlock()
+		return ErrNoEnoughSpaceForMerge
 	}
 	db.isMerging = true
 	defer func() {
@@ -162,6 +184,9 @@ func (db *DB) loadMergeFiles() error {
 			mergeFinished = true
 		}
 		if file.Name() == data.SeqNoFileName {
+			continue
+		}
+		if file.Name() == fileLockName {
 			continue
 		}
 		mergeFileNames = append(mergeFileNames, file.Name())

@@ -4,6 +4,7 @@ import (
 	"bitcast_go/data"
 	"bitcast_go/fio"
 	"bitcast_go/index"
+	"bitcast_go/utils"
 	"fmt"
 	"github.com/gofrs/flock"
 	"io"
@@ -44,6 +45,15 @@ type DB struct {
 	fileLock *flock.Flock // 文件锁 防止一文件多开
 
 	bytesWrite uint // 累计写了多少字节
+
+	reclaimSize int64 // 无效数据
+}
+
+type Stat struct {
+	KeyNum          uint  // key总数
+	DataFileNum     uint  // 数据文件的数量
+	ReclaimableSize int64 //可以进行merge回收的字节数
+	DiskSize        int64 // 数据目录所占磁盘空间
 }
 
 // 打开存储引擎
@@ -194,6 +204,27 @@ func (db *DB) getValueByPostion(logRecordPos *data.LogRecordPos) ([]byte, error)
 	return logRecord.Value, nil
 }
 
+func (db *DB) Stat() *Stat {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+
+	var dataFiles = uint(len(db.olderFiles))
+	if db.activeFile != nil {
+		dataFiles++
+	}
+
+	dirSize, err := utils.DirSize(db.options.DirPath)
+	if err != nil {
+		panic(fmt.Sprintf("failed to get dir size: %v", err))
+	}
+	return &Stat{
+		KeyNum:          uint(db.index.Size()),
+		DataFileNum:     dataFiles,
+		ReclaimableSize: db.reclaimSize,
+		DiskSize:        dirSize,
+	}
+}
+
 // Close 关闭数据库
 func (db *DB) Close() error {
 	defer func() {
@@ -269,15 +300,17 @@ func (db *DB) loadIndexerFromDataFiles() error {
 	}
 
 	updateIndex := func(key []byte, typ data.LogRecordType, pos *data.LogRecordPos) {
-		var ok bool
+		var oldPos *data.LogRecordPos
 		if typ == data.LogRecordDeleted {
-			ok = db.index.Delete(key)
+			oldPos, _ = db.index.Delete(key)
+			db.reclaimSize += int64(pos.Size)
 		} else {
-			ok = db.index.Put(key, pos)
+			oldPos = db.index.Put(key, pos)
 		}
-		if !ok {
-			panic("failed to update index")
+		if oldPos != nil {
+			db.reclaimSize += int64(oldPos.Size)
 		}
+
 	}
 	var offset int64 = 0
 	// 暂存事务数据
@@ -308,7 +341,7 @@ func (db *DB) loadIndexerFromDataFiles() error {
 			}
 
 			// 构造内存索引并保存
-			logRecordPos := &data.LogRecordPos{Fid: fileId, Offset: offset}
+			logRecordPos := &data.LogRecordPos{Fid: fileId, Offset: offset, Size: uint32(size)}
 
 			//解析key,拿到事务序列号
 			realKey, seqNo := parseLogRecordKey(logRecord.Key)
@@ -391,6 +424,10 @@ func checkOptions(options Options) error {
 	if options.DataFileSize <= 0 {
 		return ErrDataFileSizeIllegal
 	}
+	if options.DataFileMergeRatio < 0 || options.DataFileMergeRatio > 1 {
+		return ErrInvalidMergeRatio
+
+	}
 	return nil
 }
 
@@ -410,8 +447,8 @@ func (db *DB) Put(key []byte, value []byte) error {
 		return err
 	}
 
-	if ok := db.index.Put(key, pos); !ok {
-		return ErrIndexUpdataFailed
+	if oldPos := db.index.Put(key, pos); oldPos != nil {
+		db.reclaimSize += int64(oldPos.Size)
 	}
 	return nil
 
@@ -436,9 +473,12 @@ func (db *DB) Delete(key []byte) error {
 		return err
 	}
 
-	ok := db.index.Delete(key)
+	oldPos, ok := db.index.Delete(key)
 	if !ok {
 		return ErrIndexUpdataFailed
+	}
+	if oldPos != nil {
+		db.reclaimSize += int64(oldPos.Size)
 	}
 	return nil
 }
@@ -537,6 +577,7 @@ func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, er
 	pos := &data.LogRecordPos{
 		Fid:    db.activeFile.FileId,
 		Offset: writeOff,
+		Size:   uint32(size),
 	}
 	return pos, nil
 }

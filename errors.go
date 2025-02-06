@@ -22,4 +22,10 @@ var (
 	ErrMergeIsProgress = errors.New("merge is progress")
 
 	ErrDatabaseIsUsing = errors.New("database is using database")
+
+	ErrInvalidMergeRatio = errors.New("invalid merge ratio,must between 0 and 1")
+
+	ErrMergeRationUnreached = errors.New("merge ratio is unreached")
+
+	ErrNoEnoughSpaceForMerge = errors.New("no enough space for merge ratio")
 )

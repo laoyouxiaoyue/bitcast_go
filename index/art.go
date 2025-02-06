@@ -10,32 +10,35 @@ import (
 	"sync"
 )
 
-// 自适应基数树索引
-type adaptiveRadixTree struct {
+// AdaptiveRadixTree 自适应基数树索引
+type AdaptiveRadixTree struct {
 	tree goart.Tree
 	lock *sync.RWMutex
 }
 
-func (a *adaptiveRadixTree) Close() error {
+func (a *AdaptiveRadixTree) Close() error {
 	return nil
 }
 
 // NewART 初始化索引
-func NewART() *adaptiveRadixTree {
-	return &adaptiveRadixTree{
+func NewART() *AdaptiveRadixTree {
+	return &AdaptiveRadixTree{
 		tree: goart.New(),
 		lock: &sync.RWMutex{},
 	}
 }
 
-func (a *adaptiveRadixTree) Put(key []byte, pos *data.LogRecordPos) bool {
+func (a *AdaptiveRadixTree) Put(key []byte, pos *data.LogRecordPos) *data.LogRecordPos {
 	a.lock.Lock()
 	defer a.lock.Unlock()
-	a.tree.Insert(key, pos)
-	return true
+	oldValue, _ := a.tree.Insert(key, pos)
+	if oldValue == nil {
+		return nil
+	}
+	return oldValue.(*data.LogRecordPos)
 }
 
-func (a *adaptiveRadixTree) Get(key []byte) *data.LogRecordPos {
+func (a *AdaptiveRadixTree) Get(key []byte) *data.LogRecordPos {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 	value, found := a.tree.Search(key)
@@ -45,20 +48,23 @@ func (a *adaptiveRadixTree) Get(key []byte) *data.LogRecordPos {
 	return value.(*data.LogRecordPos)
 }
 
-func (a *adaptiveRadixTree) Delete(key []byte) bool {
+func (a *AdaptiveRadixTree) Delete(key []byte) (*data.LogRecordPos, bool) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
-	_, deleted := a.tree.Delete(key)
-	return deleted
+	oldValue, deleted := a.tree.Delete(key)
+	if oldValue == nil {
+		return nil, false
+	}
+	return oldValue.(*data.LogRecordPos), deleted
 }
 
-func (a *adaptiveRadixTree) Size() int {
+func (a *AdaptiveRadixTree) Size() int {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 	return a.tree.Size()
 }
 
-func (a *adaptiveRadixTree) Iterator(reverse bool) Iterator {
+func (a *AdaptiveRadixTree) Iterator(reverse bool) Iterator {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 	return newartIterator(a.tree, reverse)
