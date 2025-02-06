@@ -8,6 +8,12 @@ type Options struct {
 	SyncWrites bool //每次操作是否持久化
 
 	IndexType IndexerType
+
+	// 累计多少字节持久化一次
+	BytesPerSync uint
+
+	// 是否用mmap加载
+	MMapAtStartup bool
 }
 
 type WriteBatchOptions struct {
@@ -45,7 +51,9 @@ var DefaultOptions = Options{
 	DirPath:      ".",
 	DataFileSize: 64 * 1024 * 1024,
 	SyncWrites:   false,
+	BytesPerSync: 0,
 	IndexType:    BPlusTree,
+	MMapAtStartup: true
 }
 
 var DefaultWriteBatchOptions = WriteBatchOptions{

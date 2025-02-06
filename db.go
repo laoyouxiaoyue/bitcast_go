@@ -2,7 +2,10 @@ package bitcast_go
 
 import (
 	"bitcast_go/data"
+	"bitcast_go/fio"
 	"bitcast_go/index"
+	"fmt"
+	"github.com/gofrs/flock"
 	"io"
 	"os"
 	"path/filepath"
@@ -13,7 +16,8 @@ import (
 )
 
 const (
-	seqNoKey = "seq.no"
+	seqNoKey     = "seq.no"
+	fileLockName = "flock"
 )
 
 type DB struct {
@@ -36,6 +40,10 @@ type DB struct {
 	seqNoFileExists bool //事务序列是否存在
 
 	isInitial bool // 是否第一次
+
+	fileLock *flock.Flock // 文件锁 防止一文件多开
+
+	bytesWrite uint // 累计写了多少字节
 }
 
 // 打开存储引擎
@@ -51,6 +59,17 @@ func Open(options Options) (*DB, error) {
 			return nil, err
 		}
 	}
+
+	//判断当前文件目录是否正在使用
+	fileLock := flock.New(filepath.Join(options.DirPath, fileLockName))
+	hold, err := fileLock.TryLock()
+	if err != nil {
+		return nil, err
+	}
+	if !hold {
+		return nil, ErrDatabaseIsUsing
+	}
+
 	entries, err := os.ReadDir(options.DirPath)
 	if err != nil {
 		return nil, err
@@ -66,6 +85,7 @@ func Open(options Options) (*DB, error) {
 		olderFiles: make(map[uint32]*data.DataFile),
 		index:      index.NewIndexer(options.IndexType, options.DirPath, options.SyncWrites),
 		isInitial:  isInitial,
+		fileLock:   fileLock,
 	}
 
 	// 加载数据文件
@@ -86,6 +106,12 @@ func Open(options Options) (*DB, error) {
 		if err := db.loadIndexerFromDataFiles(); err != nil {
 			return nil, err
 		}
+
+		if db.options.MMapAtStartup {
+			if err := db.resetIoType(); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	if options.IndexType == BPlusTree {
@@ -101,6 +127,23 @@ func Open(options Options) (*DB, error) {
 		}
 	}
 	return db, nil
+}
+
+// 重置IO类型
+func (db *DB) resetIoType() error {
+	if db.activeFile == nil {
+		return nil
+	}
+	if err := db.activeFile.SetIOManager(db.options.DirPath, fio.StandardFIO); err != nil {
+		return err
+	}
+
+	for _, dataFile := range db.olderFiles {
+		if err := dataFile.SetIOManager(db.options.DirPath, fio.StandardFIO); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (db *DB) loadSeqNo() error {
 	fileName := filepath.Join(db.options.DirPath, data.SeqNoFileName)
@@ -153,6 +196,11 @@ func (db *DB) getValueByPostion(logRecordPos *data.LogRecordPos) ([]byte, error)
 
 // Close 关闭数据库
 func (db *DB) Close() error {
+	defer func() {
+		if err := db.fileLock.Unlock(); err != nil {
+			panic(fmt.Sprintf("failed to unlock file lock: %s", err))
+		}
+	}()
 	if db.activeFile == nil {
 		return nil
 	}
@@ -316,7 +364,11 @@ func (db *DB) loadDataFiles() error {
 	sort.Ints(fileIds)
 
 	for i, fileId := range fileIds {
-		dataFile, err := data.OpenDataFile(db.options.DirPath, uint32(fileId))
+		ioType := fio.StandardFIO
+		if db.options.MMapAtStartup {
+			ioType = fio.MemoryMap
+		}
+		dataFile, err := data.OpenDataFile(db.options.DirPath, uint32(fileId), ioType)
 		if err != nil {
 			return err
 		}
@@ -466,10 +518,19 @@ func (db *DB) appendLogRecord(logRecord *data.LogRecord) (*data.LogRecordPos, er
 	if err := db.activeFile.Write(encRecord); err != nil {
 		return nil, err
 	}
+	db.bytesWrite += uint(size)
 
-	if db.options.SyncWrites {
+	var needSync = db.options.SyncWrites
+	if !needSync && db.options.BytesPerSync > 0 && db.bytesWrite >= db.options.BytesPerSync {
+		needSync = true
+	}
+
+	if needSync {
 		if err := db.activeFile.Sync(); err != nil {
 			return nil, err
+		}
+		if db.bytesWrite > 0 {
+			db.bytesWrite = 0
 		}
 	}
 
@@ -488,7 +549,7 @@ func (db *DB) setActiveDataFile() error {
 		initialFileId = db.activeFile.FileId + 1
 	}
 
-	dataFile, err := data.OpenDataFile(db.options.DirPath, initialFileId)
+	dataFile, err := data.OpenDataFile(db.options.DirPath, initialFileId, fio.StandardFIO)
 	if err != nil {
 		return err
 	}

@@ -22,7 +22,7 @@ func (db *DB) Merge() error {
 	db.mu.Lock()
 	if db.isMerging {
 
-		return ErrMergeisProgress
+		return ErrMergeIsProgress
 	}
 	db.isMerging = true
 	defer func() {

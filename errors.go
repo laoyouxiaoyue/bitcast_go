@@ -19,5 +19,7 @@ var (
 
 	ErrExceedMaxBatchNum = errors.New("exceed max batch num")
 
-	ErrMergeisProgress = errors.New("merge is progress")
+	ErrMergeIsProgress = errors.New("merge is progress")
+
+	ErrDatabaseIsUsing = errors.New("database is using database")
 )

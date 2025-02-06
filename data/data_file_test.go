@@ -1,6 +1,7 @@
 package data
 
 import (
+	"bitcast_go/fio"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
@@ -9,7 +10,7 @@ import (
 
 func TestOpenDataFile(t *testing.T) {
 	dirPath := filepath.Join(os.TempDir())
-	dataFile1, err := OpenDataFile(dirPath, 0)
+	dataFile1, err := OpenDataFile(dirPath, 0, fio.StandardFIO)
 	assert.Nil(t, err)
 	assert.NotNil(t, dataFile1)
 
@@ -22,7 +23,7 @@ func TestOpenDataFile(t *testing.T) {
 
 func TestDataFile_Write(t *testing.T) {
 	dirPath := filepath.Join(os.TempDir())
-	dataFile1, err := OpenDataFile(dirPath, 0)
+	dataFile1, err := OpenDataFile(dirPath, 0, fio.StandardFIO)
 	defer func(dataFile1 *DataFile) {
 		err := dataFile1.Close()
 		assert.Nil(t, err)
@@ -42,7 +43,7 @@ func TestDataFile_Write(t *testing.T) {
 
 func TestDataFile_Close(t *testing.T) {
 	dirPath := filepath.Join(os.TempDir())
-	dataFile1, err := OpenDataFile(dirPath, 0)
+	dataFile1, err := OpenDataFile(dirPath, 0, fio.StandardFIO)
 	assert.Nil(t, err)
 	assert.NotNil(t, dataFile1)
 	err = dataFile1.Close()
@@ -51,7 +52,7 @@ func TestDataFile_Close(t *testing.T) {
 
 func TestDataFile_Sync(t *testing.T) {
 	dirPath := filepath.Join(os.TempDir())
-	dataFile1, err := OpenDataFile(dirPath, 0)
+	dataFile1, err := OpenDataFile(dirPath, 0, fio.StandardFIO)
 	defer func(dataFile1 *DataFile) {
 		err := dataFile1.Close()
 		assert.Nil(t, err)
