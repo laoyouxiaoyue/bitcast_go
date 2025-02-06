@@ -260,7 +260,9 @@ func (db *DB) Close() error {
 	if err := seqNofile.Sync(); err != nil {
 		return err
 	}
-
+	if err := seqNofile.Close(); err != nil {
+		return err
+	}
 	if err := db.activeFile.Close(); err != nil {
 		return err
 	}
@@ -271,6 +273,12 @@ func (db *DB) Close() error {
 		}
 	}
 	return nil
+}
+
+func (db *DB) Backup(dir string) error {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	return utils.CopyDir(db.options.DirPath, dir, []string{fileLockName})
 }
 
 func (db *DB) Sync() error {

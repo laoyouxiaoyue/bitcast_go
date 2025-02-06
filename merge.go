@@ -182,6 +182,7 @@ func (db *DB) loadMergeFiles() error {
 	for _, file := range dirEntries {
 		if file.Name() == data.MergeFinishedFileName {
 			mergeFinished = true
+			// 注意
 		}
 		if file.Name() == data.SeqNoFileName {
 			continue
@@ -230,7 +231,11 @@ func (db *DB) getNonMergeFileId(dirPath string) (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
-	nonMergeFileId, err := strconv.Atoi(string(record.Key))
+	nonMergeFileId, err := strconv.Atoi(string(record.Value))
+	if err != nil {
+		return 0, err
+	}
+	err = mergeFinishedFile.Close() // Warning add
 	if err != nil {
 		return 0, err
 	}

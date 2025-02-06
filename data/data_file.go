@@ -44,7 +44,7 @@ func OpenSeqNoFile(dirPath string) (*DataFile, error) {
 	return newDataFile(fileName, 0, fio.StandardFIO)
 }
 func GetDataFileName(dirPath string, fileId uint32) string {
-	return filepath.Join(dirPath, fmt.Sprintf("#{fileId}")+DataFileNameSuffix)
+	return filepath.Join(dirPath, fmt.Sprintf("%09d", fileId)+DataFileNameSuffix)
 }
 func newDataFile(fileName string, fileId uint32, ioType fio.FileIOType) (*DataFile, error) {
 	ioManager, err := fio.NewIOManager(fileName, ioType)

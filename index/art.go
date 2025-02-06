@@ -3,10 +3,8 @@ package index
 import (
 	"bitcast_go/data"
 	"bytes"
-	"fmt"
 	goart "github.com/plar/go-adaptive-radix-tree"
 	"sort"
-	"strconv"
 	"sync"
 )
 
@@ -127,7 +125,6 @@ func (b *artIterator) Seek(key []byte) {
 
 func (b *artIterator) Next() {
 	b.currIndex++
-	fmt.Printf(strconv.Itoa(b.currIndex))
 }
 
 func (b *artIterator) Valid() bool {

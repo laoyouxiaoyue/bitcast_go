@@ -7,17 +7,19 @@ import (
 	"testing"
 )
 
-func destoryDB(db *DB) {
+func DestroyDB(db *DB) {
 	if db != nil {
 		if db.activeFile != nil {
-			if err := db.Close(); err != nil {
-				panic(err)
+			_ = db.Close()
+		}
+		for _, of := range db.olderFiles {
+			if of != nil {
+				_ = of.Close()
 			}
-
-			err := os.RemoveAll(db.options.DirPath)
-			if err != nil {
-				panic(err)
-			}
+		}
+		err := os.RemoveAll(db.options.DirPath)
+		if err != nil {
+			panic(err)
 		}
 	}
 }

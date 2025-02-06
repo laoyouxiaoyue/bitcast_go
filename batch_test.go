@@ -7,12 +7,29 @@ import (
 	"testing"
 )
 
+func destroyDB(db *DB) {
+	if db != nil {
+		if db.activeFile != nil {
+			_ = db.Close()
+		}
+		for _, of := range db.olderFiles {
+			if of != nil {
+				_ = of.Close()
+			}
+		}
+		err := os.RemoveAll(db.options.DirPath)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
 func TestDB_NewWriteBatch(t *testing.T) {
 	opts := DefaultOptions
 	dir, _ := os.MkdirTemp(os.TempDir(), "bitcast")
 	opts.DirPath = dir
 	db, err := Open(opts)
-	defer destoryDB(db)
+	defer destroyDB(db)
 	assert.Nil(t, err)
 	assert.NotNil(t, db)
 
