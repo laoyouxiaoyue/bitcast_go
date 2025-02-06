@@ -50,10 +50,10 @@ type DB struct {
 }
 
 type Stat struct {
-	KeyNum          uint  // key总数
-	DataFileNum     uint  // 数据文件的数量
-	ReclaimableSize int64 //可以进行merge回收的字节数
-	DiskSize        int64 // 数据目录所占磁盘空间
+	KeyNum          uint  `json:"KeyNum"`          // key总数
+	DataFileNum     uint  `json:"DataFileNum"`     // 数据文件的数量
+	ReclaimableSize int64 `json:"ReclaimableSize"` //可以进行merge回收的字节数
+	DiskSize        int64 `json:"DiskSize"`        // 数据目录所占磁盘空间
 }
 
 // 打开存储引擎
@@ -513,6 +513,7 @@ func (db *DB) ListKeys() [][]byte {
 	var idx int
 	for iterator.Rewind(); iterator.Valid(); iterator.Next() {
 		keys[idx] = iterator.Key()
+		idx++
 	}
 	return keys
 }
