@@ -13,6 +13,8 @@ type RedisDataType = byte
 
 const (
 	String RedisDataType = iota
+	List
+	Hash
 )
 
 // RedisDataStructure Redis 数据结构服务
