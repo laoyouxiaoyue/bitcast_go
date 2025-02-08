@@ -15,6 +15,7 @@ const (
 	String RedisDataType = iota
 	List
 	Hash
+	Set
 )
 
 // RedisDataStructure Redis 数据结构服务
